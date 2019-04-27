@@ -1,0 +1,18 @@
+An attempt to re-implement the core features of [[https://github.com/jonathansick/ads_bibdesk][~ads_bibdesk~]] but using the [[https://github.com/adsabs/adsabs-dev-api][new ADS API]]
+
+* Motivation
+1. The current version of ~ads_bibdesk~ relies on Classic ADS, which is going to be turned off real soon (as of [2019-04-26 Fri])
+2. There seem to be [[https://github.com/jonathansick/ads_bibdesk/issues/68][no plans]] to update it
+   - They are waiting for ADS to allow access to API without requiring an API key
+   - It is not clear this is ever going to happen
+3. However, looking at the source code there are a million little details and edge cases that the current version handles
+   - It would be a waste to re-implement them all
+   - And I would never finish it
+4. So, current plan is to work out just the minimum changes necessary to get it working with the new API
+
+* What needs changing?
++ ~ADSConnector~
++ ~ADSHTMLParser~
+  + This seems unnecessary if we are using the API, but maybe I am missing something
+
+
