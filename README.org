@@ -17,15 +17,14 @@ An attempt to re-implement the core features of [[https://github.com/jonathansic
 
 
 * Minimal proof of concept
-+ Core functionality is
-  * For a single ADS bibcode:
-    1) Retrieve the bibtex record from ADS
-    2) Retrieve article link (arxiv or journal from ADS)
-    3) Retrieve PDF from article link
-    4) Add entry to Bibdesk database
-       - Import bibtex record as new entry
-       - Generate bib key for record
-       - Move PDF file to relevant folder and link from record
++ Core functionality is to carry out these steps for a single ADS bibcode:
+  1) Retrieve the bibtex record from ADS
+  2) Retrieve article link (arxiv or journal from ADS)
+  3) Retrieve PDF from article link
+  4) Add entry to Bibdesk database
+     - Import bibtex record as new entry
+     - Generate bib key for record
+     - Move PDF file to relevant folder and link from record
 + Steps 1) and 2) are the only ones affected by the demise of Classic ADS
   + The current code seems to scrape the ADS abstract web page to get info
   + This should not be necessary if we use the API
@@ -36,7 +35,7 @@ An attempt to re-implement the core features of [[https://github.com/jonathansic
 ** Step 1: Retrieve bibtex record from ADS
 + [X] First attempt:
   + Use the ~ads~ package
-    + I know we won't be able to do this if we want to wrap as Automator action, but I don't really care much about that
+    + I know we won't be able to do this if we want to wrap as Automator action, but I will fix that afterwards
   + This works for ~bibtex~ but not for ~bibtexabs~ export format, which is not recognized by ~ads.py~, so we will have to write our own
 + Second attempt
   + [X] Get the API token from file
@@ -65,7 +64,7 @@ An attempt to re-implement the core features of [[https://github.com/jonathansic
   print(retrieve_bibtex_from_ads(bibcode))
 #+end_src
 
-#+begin_src sh :results verbatim
+#+begin_src sh :results verbatim :exports both
 python test-ads-bibtex.py 2019arXiv190303737H
 #+end_src
 
@@ -138,7 +137,7 @@ archivePrefix = {arXiv},
 #+end_src
 
 Try it out with one of my papers:
-#+begin_src sh :results verbatim
+#+begin_src sh :results verbatim :exports both
 python test-ads-bibtex2.py 2019arXiv190303737H
 #+end_src
 
@@ -216,7 +215,7 @@ Yes! That works!
 
 #+end_src
 
-#+begin_src sh :results file
+#+begin_src sh :results file :exports both
 python test-ads-pdf.py 1999ApJ...517..565P
 #+end_src
 
@@ -226,7 +225,7 @@ python test-ads-pdf.py 1999ApJ...517..565P
 
 Try it in bash.  
 
-#+begin_src sh
+#+begin_src sh :exports both
   bibcode="1999ApJ...517..565P"
   curl https://ui.adsabs.harvard.edu/link_gateway/$bibcode/EPRINT_PDF" \
    -L -o 'ads-pdf-test.pdf'
