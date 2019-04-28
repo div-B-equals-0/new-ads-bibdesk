@@ -16,3 +16,220 @@ An attempt to re-implement the core features of [[https://github.com/jonathansic
   + This seems unnecessary if we are using the API, but maybe I am missing something
 
 
+* Minimal proof of concept
++ Core functionality is
+  * For a single ADS bibcode:
+    1) Retrieve the bibtex record from ADS
+    2) Retrieve article link (arxiv or journal from ADS)
+    3) Retrieve PDF from article link
+    4) Add entry to Bibdesk database
+       - Import bibtex record as new entry
+       - Generate bib key for record
+       - Move PDF file to relevant folder and link from record
++ Steps 1) and 2) are the only ones affected by the demise of Classic ADS
+  + The current code seems to scrape the ADS abstract web page to get info
+  + This should not be necessary if we use the API
++ Steps 3) and 4) can remain the same
+  + No need to fix what isn't broken
+
+
+** Step 1: Retrieve bibtex record from ADS
++ [X] First attempt:
+  + Use the ~ads~ package
+    + I know we won't be able to do this if we want to wrap as Automator action, but I don't really care much about that
+  + This works for ~bibtex~ but not for ~bibtexabs~ export format, which is not recognized by ~ads.py~, so we will have to write our own
++ Second attempt
+  + [X] Get the API token from file
+  + [X] Construct the https request myself
+  + [X] Extract result from the JSON that we get back
+
+*** Simple version of bibtex retrieval using ~ads.py~
+#+begin_src python :tangle test-ads-bibtex.py :eval no
+  import sys
+  import ads
+  # import ads.sandbox as ads
+
+  def retrieve_bibtex_from_ads(bibcode):
+      """
+      Get the bibtex entry for a given bibcode
+      """
+      q = ads.ExportQuery(bibcode, format="bibtex")
+      export = q.execute()
+      return export
+
+  try:
+      bibcode = str(sys.argv[1])
+  except:
+      sys.exit(f"Usage: {sys.argv[0]} BIBCODE")
+    
+  print(retrieve_bibtex_from_ads(bibcode))
+#+end_src
+
+#+begin_src sh :results verbatim
+python test-ads-bibtex.py 2019arXiv190303737H
+#+end_src
+
+#+RESULTS:
+#+begin_example
+@ARTICLE{2019MNRAS.tmp..997H,
+       author = {{Henney}, William J. and {Arthur}, S.~J.},
+        title = "{Bow shocks, bow waves, and dust waves. I. Strong coupling limit}",
+      journal = {\mnras},
+     keywords = {circumstellar matter, radiation: dynamics, stars: winds, outflows, Astrophysics - Solar and Stellar Astrophysics, Astrophysics - Astrophysics of Galaxies},
+         year = "2019",
+        month = "Apr",
+        pages = {997},
+          doi = {10.1093/mnras/stz1043},
+archivePrefix = {arXiv},
+       eprint = {1903.03737},
+ primaryClass = {astro-ph.SR},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2019MNRAS.tmp..997H},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
+
+#+end_example
+
+*** More complex version, but only standard library dependencies
++ This is still very simple really
++ See API documentation at [[https://github.com/adsabs/adsabs-dev-api/blob/master/Export_API.ipynb][Export_API.ipynb]] and [[https://github.com/adsabs/adsabs-dev-api/blob/master/Converting_curl_to_python.ipynb][Converting_curl_to_python.ipynb]]
++ The token reading function is a simplified version of what is in ~ads.py~
+
+#+begin_src python :tangle test-ads-bibtex2.py :eval no
+  import sys
+  import os
+  import json
+  import requests
+
+  TOKEN_FILE = "~/.ads/dev_key"
+  EXPORT_BASE_URL = "https://api.adsabs.harvard.edu/v1/export"
+
+  def obtain_api_token():
+      try:
+          with open(os.path.expanduser(TOKEN_FILE)) as fp:
+              token = fp.read().strip()
+      except IOError:
+          sys.exit(f"Failed to read token from {TOKEN_FILE}")
+      return token
+
+  def retrieve_bibtex_from_ads(bibcode, format_="bibtexabs"):
+      """
+      Get the bibtex+abstract entry for a given bibcode
+      """
+      token = obtain_api_token()
+      url = f"{EXPORT_BASE_URL}/{format_}"
+      r = requests.post(
+          url,
+          headers={
+              "Authorization": f"Bearer {token}",
+              "Content-type": "application/json",
+          },
+          data=json.dumps({"bibcode": [bibcode]}),
+      )
+      response = r.json()
+      return response["export"]
+
+  try:
+      bibcode = str(sys.argv[1])
+  except:
+      sys.exit(f"Usage: {sys.argv[0]} BIBCODE")
+
+  print(retrieve_bibtex_from_ads(bibcode))
+#+end_src
+
+Try it out with one of my papers:
+#+begin_src sh :results verbatim
+python test-ads-bibtex2.py 2019arXiv190303737H
+#+end_src
+
+#+RESULTS:
+#+begin_example
+@ARTICLE{2019MNRAS.tmp..997H,
+       author = {{Henney}, William J. and {Arthur}, S.~J.},
+        title = "{Bow shocks, bow waves, and dust waves. I. Strong coupling limit}",
+      journal = {\mnras},
+     keywords = {circumstellar matter, radiation: dynamics, stars: winds, outflows, Astrophysics - Solar and Stellar Astrophysics, Astrophysics - Astrophysics of Galaxies},
+         year = "2019",
+        month = "Apr",
+        pages = {997},
+     abstract = "{Dust waves and bow waves result from the action of a star's radiation
+        pressure on a stream of dusty plasma that flows past it. They
+        are an alternative mechanism to hydrodynamic bow shocks for
+        explaining the curved arcs of infrared emission seen around some
+        stars. When gas and grains are perfectly coupled, for a broad
+        class of stellar parameters, wind-supported bow shocks
+        predominate when the ambient density is below 100cm$^{-3}$. At
+        higher densities radiation-supported bow shells can form,
+        tending to be optically thin bow waves around B stars, or
+        optically thick bow shocks around early O stars. For OB stars
+        with particularly weak stellar winds, radiation-supported bow
+        shells become more prevalent.}",
+          doi = {10.1093/mnras/stz1043},
+archivePrefix = {arXiv},
+       eprint = {1903.03737},
+ primaryClass = {astro-ph.SR},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2019MNRAS.tmp..997H},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+
+
+#+end_example
+
+Yes! That works!
+** Step 2: Retrieve PDF from ADS
++ Looking at the [[https://github.com/adsabs/adsabs-dev-api/blob/master/Search_API.ipynb][API docs]] it seems you get the file directly, rather than just a link
+  + I wonder if that works with MNRAS and other edge cases
+  + Answer: it doesn't
++ It turns out that the api token is not necessary for getting the PDF file. 
+#+begin_src python :tangle test-ads-pdf.py :eval no
+  import sys
+  import os
+  import json
+  import requests
+  from urllib.parse import quote
+
+  LINK_GATEWAY_BASE_URL = "https://ui.adsabs.harvard.edu/link_gateway"
+
+  def retrieve_article_pdf_from_ads(bibcode, eprint_or_pub="PUB"):
+      """
+      Get the PDF file for a given bibcode
+      """
+      endpoint = f"{eprint_or_pub.upper()}_PDF"
+      safe_bibcode = quote(bibcode)
+      pdf_filename = f"{safe_bibcode}_{eprint_or_pub.lower()}.pdf"
+      url = f"{LINK_GATEWAY_BASE_URL}/{safe_bibcode}/{endpoint}"
+      r = requests.get(
+          url,
+          allow_redirects=True,
+      )
+      with open(pdf_filename, 'wb') as f:
+          for chunk in r.iter_content(chunk_size=128):
+              f.write(chunk)
+      return pdf_filename
+
+  try:
+      bibcode = str(sys.argv[1])
+  except:
+      sys.exit(f"Usage: {sys.argv[0]} BIBCODE")
+
+  print(retrieve_article_pdf_from_ads(bibcode, "EPRINT"), end="")
+
+#+end_src
+
+#+begin_src sh :results file
+python test-ads-pdf.py 1999ApJ...517..565P
+#+end_src
+
+#+RESULTS:
+[[file:1999ApJ...517..565P_eprint.pdf]]
+
+
+Try it in bash.  
+
+#+begin_src sh
+  bibcode="1999ApJ...517..565P"
+  curl https://ui.adsabs.harvard.edu/link_gateway/$bibcode/EPRINT_PDF" \
+   -L -o 'ads-pdf-test.pdf'
+#+end_src
+
+This works just as well. 
